@@ -1,0 +1,15 @@
+# Generated model artifacts: embeddings, caches, trained model, swipe logs.
+# All reproducible from the raw CSVs via `python -m src.embed --build`.
+artifacts/
+
+# Environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# The raw Kaggle data is large; see README for download links.
+postings/
+resumes/
+
+.ipynb_checkpoints/
+.streamlit/secrets.toml

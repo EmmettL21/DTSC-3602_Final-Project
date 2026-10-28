@@ -1,0 +1,35 @@
+# DTSC3602 Group 9 — job matching model
+# Versions are the ones this pipeline was built and measured against.
+#
+#   uv venv .venv
+#   uv pip install -r requirements.txt
+#
+# torch is CPU-only here. On a machine with CUDA, install torch from the
+# appropriate index first and the rest will resolve around it.
+
+# --- core data / modelling ---
+pandas==3.1.0
+numpy==2.5.4
+scikit-learn==1.9.1
+scipy==1.18.1
+pyarrow==26.0.0
+joblib==1.6.0
+
+# --- sentence embeddings ---
+torch==2.14.1
+sentence-transformers==6.2.0
+# sentence-transformers 6.2 imports httpx but does not declare it.
+httpx==0.28.1
+# transformers is pinned because optimum 2.1 is incompatible with the 5.x line.
+transformers==4.57.6
+
+# --- quantized ONNX backend (optional but ~3x faster on CPU) ---
+# src/embed.py falls back to plain torch if these are missing.
+optimum[onnxruntime]==2.1.0
+onnxruntime==1.31.0
+
+# --- app and notebooks ---
+streamlit==1.66.1
+matplotlib==3.11.2
+seaborn==0.13.2
+jupyter
