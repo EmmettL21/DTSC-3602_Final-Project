@@ -90,6 +90,59 @@ sides. `python -m src.pairs --check` asserts this.
 If neither trained model beats the cosine-only baselines, `metrics.json` says
 `beats_baselines: false`. That is a real result to report, not a bug.
 
+## Data audit (D2)
+
+`src/audit.py` layers three fixes on top of the cleaned postings frame, additive only
+— nothing D1 already reads is overwritten:
+
+- **Salary outliers** (raw `normalized_salary` reaches $535.6M) flagged outside a fixed
+  $1,000–$1,000,000/yr sanity band, in a new `salary_outlier_flag` column.
+- **Sentinel values** in `companies.csv` (`"0"`, `"-"`, empty, the non-ISO `"OO"`
+  country code) normalized to real `NaN`, with a `*_was_sentinel` flag per field.
+- **Likely-duplicate postings** (same title/company/location, different `job_id`)
+  flagged via `is_likely_duplicate`, not dropped.
+
+```bash
+python -m src.audit --build --smoke        # before/after counts
+python -m src.data_dictionary              # writes artifacts/data_dictionary.csv
+python -m src.pairs --freeze-check         # freeze/verify the reserved test split
+```
+
+Mojibake (`�`) and the orphaned foreign keys in `job_skills.csv`/`job_industries.csv`
+are documented, not fixed — see `write ups/DTSC3602 Project Group 9- D2.md` for why.
+Twelve candidate audit plots live in `notebooks/03_data_audit.ipynb`.
+
+D2 reserves D1's existing doubly-disjoint test split (5,784 pairs) as the project's
+final test set rather than drawing a new one. `write ups/d2_test_split_freeze.json`
+holds a SHA256 fingerprint of it; `--freeze-check` asserts the fingerprint still
+matches on every run.
+
+## Dashboard
+
+A second Streamlit app, `app/dashboard.py`, presents the data dictionary, live plots,
+quality findings, and the reserved-split summary — reading from Supabase instead of
+local parquet. It's separate from `app/streamlit_app.py` (D1's swipe demo), which is
+untouched and still reads local files.
+
+**Local setup:**
+
+```bash
+cp .env.example .env               # fill in SUPABASE_URL / SUPABASE_KEY
+psql "$SUPABASE_DB_URL" -f supabase/schema.sql   # or paste into the SQL editor
+python scripts/upload_to_supabase.py             # --dry-run first to sanity-check
+streamlit run app/dashboard.py
+```
+
+**Deploying on Modal:**
+
+```bash
+modal secret create supabase-creds SUPABASE_URL=... SUPABASE_KEY=...
+modal deploy modal_app.py
+```
+
+`modal_app.py` builds its image straight from `requirements.txt` and reads the same
+two environment variable names locally and in production, via `src/supabase_client.py`.
+
 ## Privacy
 
 `src/text_clean.py` strips emails, phone numbers, URLs, street addresses, ZIPs,
@@ -118,6 +171,12 @@ src/embed.py        MiniLM and TF-IDF/SVD vectors, cached
 src/features.py     per-pair feature matrix
 src/model.py        train, evaluate, fairness, persist
 src/recommend.py    serving: resume -> ranked deck
-app/streamlit_app.py  swipe demo + logging
-notebooks/          EDA and results for the write-up
+src/audit.py        D2: salary-outlier, sentinel, duplicate flags
+src/data_dictionary.py  D2: generates artifacts/data_dictionary.csv
+src/supabase_client.py  shared Supabase client (dashboard + upload script)
+app/streamlit_app.py  D1 swipe demo + logging
+app/dashboard.py     D2 data-audit dashboard, reads from Supabase
+scripts/upload_to_supabase.py  pushes audit artifacts to Supabase
+modal_app.py         Modal deployment entrypoint for app/dashboard.py
+notebooks/          EDA (01) and D2 data-audit (03) plots for the write-up
 ```

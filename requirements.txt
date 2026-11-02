@@ -32,4 +32,11 @@ onnxruntime==1.31.0
 streamlit==1.66.1
 matplotlib==3.11.2
 seaborn==0.13.2
-jupyter
+jupyter==1.1.1
+nbconvert==7.17.2
+nbformat==5.11.1
+
+# --- D2: Supabase-backed dashboard, deployed on Modal ---
+supabase==2.33.0
+modal==1.6.3
+python-dotenv==1.2.4

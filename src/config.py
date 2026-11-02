@@ -15,6 +15,10 @@ SKILL_MAP_CSV = POSTINGS_DIR / "mappings" / "skills.csv"
 INDUSTRY_MAP_CSV = POSTINGS_DIR / "mappings" / "industries.csv"
 COMPANIES_CSV = POSTINGS_DIR / "companies" / "companies.csv"
 EMPLOYEE_COUNTS_CSV = POSTINGS_DIR / "companies" / "employee_counts.csv"
+# Not joined into `load_postings` -- documented as unused sources in the D2
+# data dictionary rather than silently ignored.
+COMPANY_INDUSTRIES_CSV = POSTINGS_DIR / "companies" / "company_industries.csv"
+COMPANY_SPECIALITIES_CSV = POSTINGS_DIR / "companies" / "company_specialities.csv"
 
 RESUMES_CSV = ROOT / "resumes" / "Resume" / "Resume.csv"
 
@@ -22,6 +26,11 @@ RESUMES_CSV = ROOT / "resumes" / "Resume" / "Resume.csv"
 ARTIFACTS = ROOT / "artifacts"
 POSTINGS_PARQUET = ARTIFACTS / "postings_clean.parquet"
 RESUMES_PARQUET = ARTIFACTS / "resumes_clean.parquet"
+# D2 audit outputs. Additive siblings of the two parquets above -- D1's
+# pipeline (model.py, recommend.py, the swipe app) keeps reading the originals.
+POSTINGS_AUDITED_PARQUET = ARTIFACTS / "postings_audited.parquet"
+COMPANIES_AUDITED_PARQUET = ARTIFACTS / "companies_audited.parquet"
+DATA_DICTIONARY_CSV = ARTIFACTS / "data_dictionary.csv"
 POST_EMB_NPY = ARTIFACTS / "post_emb.npy"
 POST_EMB_INDEX = ARTIFACTS / "post_emb_index.parquet"
 RESUME_EMB_NPY = ARTIFACTS / "resume_emb.npy"
@@ -77,6 +86,25 @@ BLIND_SWIPE_MS = 1500
 
 # Candidates pulled by cosine before the classifier reranks them.
 RETRIEVAL_DEPTH = 500
+
+# --- D2 data audit -----------------------------------------------------------
+# Fixed sanity bounds for `salary_annual`, not a percentile cut -- a percentile
+# would clip legitimate high executive salaries along with the clear data-entry
+# errors (postings.csv has rows up to $535.6M). Anything outside this range is
+# flagged, never dropped.
+SALARY_SANITY_FLOOR = 1_000.0
+SALARY_SANITY_CEILING = 1_000_000.0
+
+# A posting sharing (title, company_name, location) with another is flagged as
+# a likely duplicate -- re-posted listings, not necessarily bad job_ids.
+DUPLICATE_KEY_COLS = ["title", "company_name", "location"]
+
+# Tracked (not gitignored) D2 write-up assets -- `artifacts/` is gitignored, so
+# anything that must survive in the repo (the reserved-split fingerprint, the
+# chosen figures) lives under `write ups/` instead.
+WRITEUPS_DIR = ROOT / "write ups"
+D2_FIGURES_DIR = WRITEUPS_DIR / "d2_figures"
+TEST_SPLIT_FREEZE_JSON = WRITEUPS_DIR / "d2_test_split_freeze.json"
 
 
 def ensure_artifacts() -> Path:

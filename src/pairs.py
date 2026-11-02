@@ -18,6 +18,9 @@ of the sample and leaves a test set too thin to rank against.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -206,14 +209,73 @@ def _check() -> None:
     print(f"jobs     train {train.job_id.nunique():,}  test {test.job_id.nunique():,}")
 
 
+def _fingerprint(ids: set[int]) -> str:
+    """SHA256 of the sorted ID list -- order-independent, so re-running the
+    same seeded split always reproduces the same digest."""
+    blob = ",".join(str(i) for i in sorted(ids)).encode()
+    return hashlib.sha256(blob).hexdigest()
+
+
+def freeze_check() -> None:
+    """D2's "reserve final test data": freeze the existing doubly-disjoint
+    test partition rather than carve a new one.
+
+    `pairs.parquet` lives in `artifacts/`, which is gitignored, so the proof
+    that the reserved set hasn't changed has to live somewhere tracked.
+    `write ups/d2_test_split_freeze.json` is that proof: the first run writes
+    the resume/job ID fingerprints, every run after asserts they still match.
+    A mismatch means the test partition moved (a different seed, a different
+    `TEST_GROUP_FRAC`, more resumes/postings added) and D2's "reserved" claim
+    no longer holds.
+    """
+    pairs, _, _ = build()
+    test = pairs[pairs.split == "test"]
+    resume_ids = set(test.resume_id.tolist())
+    job_ids = set(test.job_id.tolist())
+
+    summary = {
+        "n_pairs": len(test),
+        "n_resumes": len(resume_ids),
+        "n_jobs": len(job_ids),
+        "resume_id_sha256": _fingerprint(resume_ids),
+        "job_id_sha256": _fingerprint(job_ids),
+    }
+
+    if not C.TEST_SPLIT_FREEZE_JSON.exists():
+        summary["frozen_on"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        C.TEST_SPLIT_FREEZE_JSON.parent.mkdir(parents=True, exist_ok=True)
+        C.TEST_SPLIT_FREEZE_JSON.write_text(json.dumps(summary, indent=2) + "\n")
+        print(f"froze the reserved test split -> {C.TEST_SPLIT_FREEZE_JSON}")
+        print(json.dumps(summary, indent=2))
+        return
+
+    frozen = json.loads(C.TEST_SPLIT_FREEZE_JSON.read_text())
+    mismatches = [
+        k for k in ("n_pairs", "n_resumes", "n_jobs", "resume_id_sha256", "job_id_sha256")
+        if frozen.get(k) != summary[k]
+    ]
+    if mismatches:
+        raise AssertionError(
+            f"reserved test split no longer matches the frozen fingerprint "
+            f"(changed: {mismatches}) -- see write ups/d2_test_split_freeze.json"
+        )
+    print(f"reserved test split OK: matches the fingerprint frozen on {frozen['frozen_on']}")
+    print(f"  {summary['n_pairs']:,} pairs, {summary['n_resumes']:,} resumes, "
+          f"{summary['n_jobs']:,} jobs")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", action="store_true", help="rebuild and verify the split")
+    ap.add_argument("--freeze-check", action="store_true",
+                     help="write or verify the D2 reserved-test-data fingerprint")
     ap.add_argument("-k", type=int, default=C.PAIRS_PER_RESUME_K)
     args = ap.parse_args()
 
     if args.check:
         _check()
+    elif args.freeze_check:
+        freeze_check()
     else:
         pairs, _, _ = build(k=args.k, rebuild=True)
         print(f"wrote {len(pairs):,} pairs to {C.PAIRS_PARQUET}")

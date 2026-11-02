@@ -13,3 +13,6 @@ resumes/
 
 .ipynb_checkpoints/
 .streamlit/secrets.toml
+
+# Supabase/Modal credentials -- never commit real keys, only .env.example.
+.env
